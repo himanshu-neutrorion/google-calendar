@@ -7,7 +7,10 @@ use Illuminate\Http\Request;
 use App\Http\Requests;
 use App\User;
 
-
+define('SCOPES', implode(' ', array(
+                \Google_Service_Calendar::CALENDAR)
+        ));
+        define('CREDENTIALS_PATH', __DIR__ . '/../../../calendar-credentials.json');
 
 class UserController extends Controller
 {
@@ -16,10 +19,8 @@ class UserController extends Controller
 
 
 
-        define('SCOPES', implode(' ', array(
-                \Google_Service_Calendar::CALENDAR)
-        ));
-        $google_redirect_url = route('glogin');
+        
+        $google_redirect_url = route('list');
         $gClient = new \Google_Client();
         $gClient->setApplicationName(config('google.app_name'));
         $gClient->setClientId(config('google.client_id'));
@@ -33,54 +34,64 @@ class UserController extends Controller
 //            'https://www.googleapis.com/auth/userinfo.email',
 //            'https://www.googleapis.com/auth/userinfo.profile',
 //        ));
-        $google_oauthV2 = new \Google_Service_Oauth2($gClient);
-        
+//        $google_oauthV2 = new \Google_Service_Oauth2($gClient);
+        // Load previously authorized credentials from a file.
+        $credentialsPath =$this->expandHomeDirectory(CREDENTIALS_PATH);
+    if (file_exists($credentialsPath)) {
+        $accessToken = json_decode(file_get_contents($credentialsPath), true);
+        $gClient->setAccessToken($accessToken);
+    }
+        else
+            if($request->has('code'))
         if ($request->get('code')){
+            $authCode = $request->get('code');
+            $accessToken = $gClient->fetchAccessTokenWithAuthCode($authCode);
             $gClient->authenticate($request->get('code'));
-            $request->session()->put('token', $gClient->getAccessToken());
+            if(!file_exists(dirname($credentialsPath))) {
+                mkdir(dirname($credentialsPath), 0700, true);
+            }
+            file_put_contents($credentialsPath, json_encode($accessToken));
+            $gClient->setAccessToken($accessToken);
+//            $request->session()->put('token', $gClient->getAccessToken());
         }
-        if ($request->session()->get('token'))
-        {
-            $gClient->setAccessToken($request->session()->get('token'));
-        }
+//        if ($request->session()->get('token'))
+//        {
+//            $gClient->setAccessToken($request->session()->get('token'));
+//        }
+
         if ($gClient->getAccessToken())
         {
-            //For logged in user, get details from google using access token
-
-            $service = new \Google_Service_Calendar($gClient);
-            $calendarId = 'primary';
-            $optParams = array(
-                'maxResults' => 10,
-                'orderBy' => 'startTime',
-                'singleEvents' => TRUE,
-                'timeMin' => date('c'),
-            );
-            $results = $service->events->listEvents($calendarId, $optParams);
-
-            if (count($results->getItems()) == 0) {
-                print "No upcoming events found.\n";
-            } else {
-                print "Upcoming events:\n";
-                foreach ($results->getItems() as $event) {
-                    $start = $event->start->dateTime;
-                    if (empty($start)) {
-                        $start = $event->start->date;
-                    }
-                    printf("%s (%s)\n", $event->getSummary(), $start);
-                }
+            // Refresh the token if it's expired.
+            if ($gClient->isAccessTokenExpired()) {
+                $gClient->fetchAccessTokenWithRefreshToken(json_decode($gClient->getRefreshToken()));
+                file_put_contents($credentialsPath, json_encode($gClient->getAccessToken()));
             }
 
-            $this->calendar($service);
+return $gClient;
 
         } else
         {
 
             $authUrl = $gClient->createAuthUrl();
-            return redirect()->to($authUrl);
+           return redirect()->to($authUrl);
         }
+        return $gClient;
     }
 
-    public function calendar($service){
+    function expandHomeDirectory($path) {
+        $homeDirectory = getenv('HOME');
+        if (empty($homeDirectory)) {
+            $homeDirectory = getenv('HOMEDRIVE') . getenv('HOMEPATH');
+        }
+        return str_replace('~', realpath($homeDirectory), $path);
+    }
+
+    public function calendar(Request $request){
+        $gClient =$this->googleLogin($request);
+		if(is_a($gClient,'Illuminate\Http\RedirectResponse')){
+			return $gClient;
+		}
+        $service = new \Google_Service_Calendar($gClient);
         $event = new \Google_Service_Calendar_Event(array(
             'summary' => 'NextMail Exercise for founding Engineer',
             'location' => 'San Fransico',
@@ -97,7 +108,7 @@ class UserController extends Controller
 //                'RRULE:FREQ=DAILY;COUNT=2'
 //            ),
             'attendees' => array(
-                array('email' => 'himanshu.dadhich@easyecom.in'),
+                array('email' => '1990.himanshu@gmail.com'),
                 array('email' => 'ratidadhich@gmail.com'),
             ),
             'reminders' => array(
@@ -116,6 +127,37 @@ class UserController extends Controller
 
         $event = $service->events->insert($calendarId, $event,$optParams);
         printf('Event created: %s\n', $event->htmlLink);
+    }
+
+    public function listEvents(Request $request){
+        $gClient =$this->googleLogin($request);
+		if(is_a($gClient,'Illuminate\Http\RedirectResponse')){
+			return $gClient;
+		}
+        $service = new \Google_Service_Calendar($gClient);
+        $calendarId = 'primary';
+        $optParams = array(
+            'maxResults' => 10,
+            'orderBy' => 'startTime',
+            'singleEvents' => TRUE,
+            'timeMin' => date('c'),
+        );
+        $results = $service->events->listEvents($calendarId, $optParams);
+
+        if (count($results->getItems()) == 0) {
+            print "No upcoming events found.\n";
+        } else {
+            print "Upcoming events:\n";
+            foreach ($results->getItems() as $event) {
+                $start = $event->start->dateTime;
+                if (empty($start)) {
+                    $start = $event->start->date;
+                }
+                printf("%s (%s)\n", $event->getSummary(), $start);
+            }
+        }
+
+        // $this->calendar($request);
     }
 
 }
