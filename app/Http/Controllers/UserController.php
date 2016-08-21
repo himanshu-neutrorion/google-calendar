@@ -16,7 +16,7 @@ class UserController extends Controller
 {
 
     public static function googleLogin(Request $request)  {
-        $google_redirect_url = route('list');
+        $google_redirect_url = route('return');
         $gClient = new \Google_Client();
         $gClient->setApplicationName(config('google.app_name'));
         $gClient->setClientId(config('google.client_id'));
@@ -85,6 +85,13 @@ class UserController extends Controller
         return str_replace('~', realpath($homeDirectory), $path);
     }
 
+public function returns(Request $request){
+    $gClient =UserController::googleLogin($request);
+    if(is_a($gClient,'Illuminate\Http\RedirectResponse')){
+        return $gClient;
+    }
+    require_once __DIR__.'/../../../resources/views/calendar/index.html';
 
+}
 
 }

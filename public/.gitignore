@@ -1,0 +1,7 @@
+.DS_STORE
+.idea
+coverage
+node_modules/
+
+*.iml
+calendar.min.js

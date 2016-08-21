@@ -86,9 +86,14 @@ class CalendarController extends Controller
             $i++;
 
         }
+//        require_once __DIR__.'/../../../resources/views/calendar/index.html';
         echo json_encode($events);
 
 
-        // $this->createCalendarEvent($request);
+        // $this->createCalendarEvent($request);a
     }
+//    public function fetchEvent(Request $request){
+//        $data =$this->listEvents($request);
+//        echo $data;
+//    }
 }
