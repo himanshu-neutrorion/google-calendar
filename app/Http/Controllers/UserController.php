@@ -24,7 +24,7 @@ class UserController extends Controller
         $gClient->setRedirectUri($google_redirect_url);
         $gClient->setDeveloperKey(config('google.api_key'));
         $gClient->setScopes(SCOPES);
-//        $gClient->setAccessType('offline');
+       $gClient->setAccessType('offline');
 //        $gClient->setScopes(array(
 //            'https://www.googleapis.com/auth/plus.me',
 //            'https://www.googleapis.com/auth/userinfo.email',
@@ -59,8 +59,11 @@ class UserController extends Controller
         {
             // Refresh the token if it's expired.
             if ($gClient->isAccessTokenExpired()) {
-                $gClient->fetchAccessTokenWithRefreshToken(json_decode($gClient->getRefreshToken()));
-                file_put_contents($credentialsPath, json_encode($gClient->getAccessToken()));
+                $refreshToken = json_decode($gClient->getRefreshToken());
+                $gClient->fetchAccessTokenWithRefreshToken($refreshToken);
+                $accessToken = $gClient->getAccessToken();
+                $accessToken['refresh_token'] = $refreshToken;
+                file_put_contents($credentialsPath, json_encode($accessToken));
             }
 
             return $gClient;
