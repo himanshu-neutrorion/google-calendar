@@ -42,3 +42,6 @@ Route::get('logout',array('as'=>'logout',function(){
 
 }));
 Route::get('return',array('as'=>'return','middleware' => 'cors', 'uses'=>'UserController@returns')) ;
+Route::get('test',function(){
+    echo "I am in";
+});
